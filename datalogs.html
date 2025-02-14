@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Logs Dashboard</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            display: flex;
+            flex-direction: row;
+            font-family: Arial, sans-serif;
+            background-color: #e8f5e9; /* Light green background */
+            color: #1b5e20; /* Dark green text */
+        }
+
+        #buttons-container {
+            flex: 1;
+            padding: 20px;
+            text-align: right;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            position: sticky;
+            top: 0;
+            background-color: #c8e6c9; /* Light green shade */
+            height: 100vh;
+            border-right: 2px solid #1b5e20;
+            overflow-y: auto;
+        }
+
+        #tables-container {
+            flex: 3;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .data-table-container {
+            margin-bottom: 40px;
+            display: none;
+            background-color: #ffffff; /* White background for tables */
+            border: 1px solid #4caf50;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.5em;
+            color: #1b5e20;
+            display: none;
+        }
+
+        .spinner {
+            border: 8px solid #f3f3f3;
+            border-top: 8px solid #1b5e20;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 2s linear infinite;
+        }
+
+        .table-title {
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: #1b5e20;
+            margin-bottom: 10px;
+        }
+
+        .btn-primary {
+            background-color: #4caf50;
+            border: none;
+        }
+
+        .btn-primary:hover {
+            background-color: #388e3c;
+        }
+
+        .btn-success {
+            background-color: #1b5e20;
+            border: none;
+        }
+
+        .btn-success:hover {
+            background-color: #145a16;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+    <!-- Firebase and HTML2PDF -->
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-database.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.min.js"></script>
+</head>
+
+<body>
+    <!-- Buttons for Days -->
+    <div id="buttons-container">
+        <h5 class="text-center font-weight-bold">Select a Day</h5>
+    </div>
+
+    <!-- Tables Container -->
+    <div id="tables-container">
+        <h3 class="text-center mb-4">Data Logs</h3>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div id="loading" class="text-center my-auto">
+        <div class="spinner"></div>
+        Loading data...
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDAYL5q-CG3bU1VuRs3PVZ11CUm34ML5BM",
+            authDomain: "dataloger-48c70.firebaseapp.com",
+            databaseURL: "https://dataloger-48c70-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "dataloger-48c70",
+            storageBucket: "dataloger-48c70.firebasestorage.app",
+            messagingSenderId: "651248484497",
+            appId: "1:651248484497:web:0c5ab0d250049b2a99bf30",
+            measurementId: "G-Q795NPXTMR"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        const ref = db.ref("logs");
+
+        // Show loading animation
+        document.getElementById("loading").style.display = "block";
+
+        ref.once("value", function (snapshot) {
+            const data = snapshot.val();
+            if (data) {
+                const buttonsContainer = document.getElementById("buttons-container");
+
+                Object.keys(data).forEach(dayNode => {
+                    // Create Day Button
+                    const dayButton = document.createElement('button');
+                    dayButton.className = 'btn btn-primary btn-block';
+                    dayButton.textContent = `${dayNode.charAt(0).toUpperCase() + dayNode.slice(1)}`;
+                    buttonsContainer.appendChild(dayButton);
+
+                    // Create Table Container
+                    const dayTableContainer = document.createElement('div');
+                    dayTableContainer.className = 'data-table-container';
+                    dayTableContainer.id = `${dayNode}-data`;
+                    document.getElementById("tables-container").appendChild(dayTableContainer);
+
+                    let isOpen = false;
+
+                    dayButton.addEventListener('click', function () {
+                        if (isOpen) {
+                            dayTableContainer.style.display = 'none';
+                            dayButton.classList.remove('active');
+                        } else {
+                            if (!dayTableContainer.innerHTML) {
+                                const dayData = data[dayNode];
+                                Object.keys(dayData).forEach(hourNode => {
+                                    const hourData = dayData[hourNode];
+                                    const tableContainer = document.createElement('div');
+                                    tableContainer.className = 'table-responsive';
+
+                                    const tableTitle = document.createElement('div');
+                                    tableTitle.className = 'table-title';
+                                    tableTitle.textContent = `Data for ${dayNode} - ${hourNode}`;
+                                    tableContainer.appendChild(tableTitle);
+
+                                    const table = document.createElement('table');
+                                    table.className = 'table table-bordered table-hover';
+                                    const thead = document.createElement('thead');
+                                    const tr = document.createElement('tr');
+                                    tr.innerHTML = `
+                                        <th>Minutes</th>
+                                        <th>Button Turner</th>
+                                        <th>Egg Turner</th>
+                                        <th>Fan Status</th>
+                                        <th>Heater Status</th>
+                                        <th>Humidity</th>
+                                        <th>Temperature</th>
+                                        <th>Water Presence</th>
+                                    `;
+                                    thead.appendChild(tr);
+                                    table.appendChild(thead);
+
+                                    const tbody = document.createElement('tbody');
+                                    table.appendChild(tbody);
+
+                                    Object.keys(hourData).forEach(minuteNode => {
+                                        const minuteData = hourData[minuteNode];
+                                        const row = tbody.insertRow();
+                                        row.innerHTML = `
+                                            <td>${minuteNode}</td>
+                                            <td>${minuteData.Button_turner_status || ''}</td>
+                                            <td>${minuteData.Egg_turner_status || ''}</td>
+                                            <td>${minuteData['Fan Status'] || ''}</td>
+                                            <td>${minuteData.Heater_status || ''}</td>
+                                            <td>${minuteData.Humidity || ''}</td>
+                                            <td>${minuteData.Temperature || ''}</td>
+                                            <td>${minuteData.Water_presense || ''}</td>
+                                        `;
+                                    });
+
+                                    tableContainer.appendChild(table);
+
+                                    // Download Button
+                                    const downloadButton = document.createElement('button');
+                                    downloadButton.className = 'btn btn-success mt-2';
+                                    downloadButton.textContent = 'Download PDF';
+                                    downloadButton.addEventListener('click', function () {
+                                        downloadButton.style.display = 'none';
+                                        const opt = {
+                                            margin: 0.5,
+                                            filename: `Data_${dayNode}_${hourNode}.pdf`,
+                                            image: { type: 'jpeg', quality: 0.98 },
+                                            html2canvas: { scale: 2 },
+                                            jsPDF: { unit: 'in', format: 'legal', orientation: 'landscape' }
+                                        };
+                                        html2pdf()
+                                            .from(tableContainer)
+                                            .set(opt)
+                                            .save()
+                                            .then(() => {
+                                                downloadButton.style.display = 'block';
+                                            });
+                                    });
+
+                                    tableContainer.appendChild(downloadButton);
+                                    dayTableContainer.appendChild(tableContainer);
+                                });
+                            }
+                            dayTableContainer.style.display = 'block';
+                            dayButton.classList.add('active');
+                        }
+                        isOpen = !isOpen;
+                    });
+                });
+            }
+
+            // Hide loading animation after data is loaded
+            document.getElementById("loading").style.display = "none";
+        });
+    </script>
+</body>
+
+</html>
