@@ -11,10 +11,33 @@
         /* Previous styles remain the same */
         body {
             display: flex;
-            flex-direction: row;
+            flex-direction: column;
             font-family: Arial, sans-serif;
             background-color: #e8f5e9;
             color: #1b5e20;
+            min-height: 100vh;
+        }
+
+        .main-content {
+            display: flex;
+            flex-direction: row;
+            flex: 1;
+        }
+
+        header {
+            background-color: #14532d;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        footer {
+            color: #666;
+            padding: 10px 20px;
+            text-align: center;
+            margin-top: auto;
         }
 
         #buttons-container {
@@ -27,7 +50,7 @@
             position: sticky;
             top: 0;
             background-color: #c8e6c9;
-            height: 100vh;
+            height: calc(100vh - 120px); /* Adjusted for header and footer */
             border-right: 2px solid #1b5e20;
             overflow-y: auto;
         }
@@ -36,6 +59,7 @@
             flex: 3;
             padding: 20px;
             overflow-y: auto;
+            height: calc(100vh - 120px); /* Adjusted for header and footer */
         }
 
         .data-table-container {
@@ -90,6 +114,25 @@
 
         .btn-success:hover {
             background-color: #145a16;
+        }
+
+        .btn-danger {
+            background-color: #dc3545;
+            border: none;
+        }
+
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+    
+        .btn-reset {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+        }
+
+        .btn-reset:hover {
+            background-color: #c82333;
         }
 
         .day-button-container {
@@ -148,6 +191,21 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .checkbox-container {
+            margin-top: 15px;
+        }
+        a {
+            color: white;
+        }
+        a:hover {
+            color: black;
+        }
     </style>
     <!-- Firebase and HTML2PDF -->
     <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
@@ -156,15 +214,33 @@
 </head>
 
 <body>
-    <!-- Buttons for Days -->
-    <div id="buttons-container">
-        <h5 class="text-center font-weight-bold">Select a Day</h5>
+    <!-- Header -->
+    <header>
+        <div class="logo">Data Logs Dashboard</div>
+        <div>
+            <button class="btn btn-primary" id="navButton"><a href="index.html">Back</a></button>
+            <button id="resetButton" class="btn btn-reset">Reset All Data</button>
+        </div>
+       
+    </header>
+
+    <div class="main-content">
+        <!-- Buttons for Days -->
+        <div id="buttons-container">
+            <h5 class="text-center font-weight-bold">Select a Day</h5>
+        </div>
+
+        <!-- Tables Container -->
+        <div id="tables-container">
+            <h3 class="text-center mb-4">Data Logs</h3>
+        </div>
     </div>
 
-    <!-- Tables Container -->
-    <div id="tables-container">
-        <h3 class="text-center mb-4">Data Logs</h3>
-    </div>
+    <!-- Footer -->
+    <footer>
+        <div>© 2025 IOT Egg Incubator</div>
+        <div>Data Logs Dashboard System</div>
+    </footer>
 
     <!-- Loading Spinner -->
     <div id="loading" class="text-center my-auto">
@@ -196,6 +272,24 @@
         </div>
     </div>
 
+    <!-- Reset Confirmation Modal -->
+    <div id="resetModal" class="modal">
+        <div class="modal-content">
+            <h4>Confirm System Reset</h4>
+            <p>WARNING: This will reset ALL data in the system. All logs, incubator data, and time settings will be erased. This action cannot be undone.</p>
+            <p>Note: Make sure that the Incubator is unplug or no power before you confirm the reset!</p>
+            <div class="checkbox-container">
+                <label>
+                    <input type="checkbox" id="resetConfirmCheckbox"> I understand this action will erase all data
+                </label>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-secondary" id="cancelReset">Cancel</button>
+                <button class="btn btn-danger" id="confirmReset" disabled>Reset System</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const firebaseConfig = {
             apiKey: "AIzaSyDAYL5q-CG3bU1VuRs3PVZ11CUm34ML5BM",
@@ -210,7 +304,9 @@
 
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
-        const ref = db.ref("logs");
+        const logsRef = db.ref("logs");
+        const lastTimeRef = db.ref("last_time");
+        const incubatorDataRef = db.ref("incubator_data");
 
         // Show loading animation
         document.getElementById("loading").style.display = "block";
@@ -218,13 +314,64 @@
         // Get modal elements
         const dayModal = document.getElementById("deleteModal");
         const hourModal = document.getElementById("deleteHourModal");
+        const resetModal = document.getElementById("resetModal");
         const cancelDelete = document.getElementById("cancelDelete");
         const confirmDelete = document.getElementById("confirmDelete");
         const cancelDeleteHour = document.getElementById("cancelDeleteHour");
         const confirmDeleteHour = document.getElementById("confirmDeleteHour");
+        const resetButton = document.getElementById("resetButton");
+        const cancelReset = document.getElementById("cancelReset");
+        const confirmReset = document.getElementById("confirmReset");
+        const resetConfirmCheckbox = document.getElementById("resetConfirmCheckbox");
         let currentDayToDelete = null;
         let currentHourToDelete = null;
         let currentDayForHour = null;
+
+        // Reset button functionality
+        resetButton.onclick = function() {
+            resetModal.style.display = "block";
+        }
+
+        // Enable/disable confirm reset button based on checkbox
+        resetConfirmCheckbox.onchange = function() {
+            confirmReset.disabled = !this.checked;
+        }
+
+        // Reset confirmation button
+        confirmReset.onclick = function() {
+            // Reset last_time node
+            lastTimeRef.set({
+                days: 0,
+                hours: 0,
+                minutes: 0
+            })
+            // Delete all logs
+            .then(() => logsRef.remove())
+            // Delete all incubator data
+            .then(() => incubatorDataRef.remove())
+            .then(() => {
+                alert("System has been reset successfully");
+                resetModal.style.display = "none";
+                resetConfirmCheckbox.checked = false;
+                confirmReset.disabled = true;
+                // Reload the page to reflect changes
+                window.location.reload();
+            })
+            .catch((error) => {
+                console.error("Error resetting system:", error);
+                alert("Error resetting system. Please try again.");
+                resetModal.style.display = "none";
+                resetConfirmCheckbox.checked = false;
+                confirmReset.disabled = true;
+            });
+        }
+
+        // Cancel reset
+        cancelReset.onclick = function() {
+            resetModal.style.display = "none";
+            resetConfirmCheckbox.checked = false;
+            confirmReset.disabled = true;
+        }
 
         // Close modals when clicking cancel
         cancelDelete.onclick = function() {
@@ -243,211 +390,230 @@
             if (event.target == hourModal) {
                 hourModal.style.display = "none";
             }
+            if (event.target == resetModal) {
+                resetModal.style.display = "none";
+                resetConfirmCheckbox.checked = false;
+                confirmReset.disabled = true;
+            }
         }
 
-        ref.once("value", function (snapshot) {
-            const data = snapshot.val();
-            if (data) {
-                const buttonsContainer = document.getElementById("buttons-container");
+        logsRef.once("value", function (snapshot) {
+    const data = snapshot.val();
+    if (data) {
+        const buttonsContainer = document.getElementById("buttons-container");
 
-                Object.keys(data).forEach(dayNode => {
-                    // Create container for day button and delete button
-                    const dayButtonContainer = document.createElement('div');
-                    dayButtonContainer.className = 'day-button-container';
+        Object.keys(data).forEach(dayNode => {
+            // Create container for day button and delete button
+            const dayButtonContainer = document.createElement('div');
+            dayButtonContainer.className = 'day-button-container';
 
-                    // Create Day Button
-                    const dayButton = document.createElement('button');
-                    dayButton.className = 'btn btn-primary';
-                    dayButton.style.flex = '1';
-                    dayButton.textContent = `${dayNode.charAt(0).toUpperCase() + dayNode.slice(1)}`;
+            // Create Day Button
+            const dayButton = document.createElement('button');
+            dayButton.className = 'btn btn-primary';
+            dayButton.style.flex = '1';
+            dayButton.textContent = `${dayNode.charAt(0).toUpperCase() + dayNode.slice(1)}`;
 
-                    // Create Delete Button
-                    const deleteButton = document.createElement('button');
-                    deleteButton.className = 'btn btn-delete';
-                    deleteButton.textContent = 'Delete';
+            // Create Delete Button
+            const deleteButton = document.createElement('button');
+            deleteButton.className = 'btn btn-delete';
+            deleteButton.textContent = 'Delete';
 
-                    // Add delete functionality
-                    deleteButton.onclick = function(e) {
-                        e.stopPropagation();
-                        currentDayToDelete = dayNode;
-                        dayModal.style.display = "block";
-                    }
-
-                    // Add buttons to container
-                    dayButtonContainer.appendChild(dayButton);
-                    dayButtonContainer.appendChild(deleteButton);
-                    buttonsContainer.appendChild(dayButtonContainer);
-
-                    // Create Table Container
-                    const dayTableContainer = document.createElement('div');
-                    dayTableContainer.className = 'data-table-container';
-                    dayTableContainer.id = `${dayNode}-data`;
-                    document.getElementById("tables-container").appendChild(dayTableContainer);
-
-                    let isOpen = false;
-
-                    dayButton.addEventListener('click', function () {
-                        if (isOpen) {
-                            dayTableContainer.style.display = 'none';
-                            dayButton.classList.remove('active');
-                        } else {
-                            if (!dayTableContainer.innerHTML) {
-                                const dayData = data[dayNode];
-                                Object.keys(dayData).forEach(hourNode => {
-                                    const hourData = dayData[hourNode];
-                                    const tableContainer = document.createElement('div');
-                                    tableContainer.className = 'table-responsive';
-                                    tableContainer.id = `${dayNode}-${hourNode}-container`;
-
-                                    const tableTitle = document.createElement('div');
-                                    tableTitle.className = 'table-title';
-                                    tableTitle.textContent = `Data for ${dayNode} - ${hourNode}`;
-                                    tableContainer.appendChild(tableTitle);
-
-                                    const table = document.createElement('table');
-                                    table.className = 'table table-bordered table-hover';
-                                    const thead = document.createElement('thead');
-                                    const tr = document.createElement('tr');
-                                    tr.innerHTML = `
-                                        <th>Minutes</th>
-                                        <th>Button Turner</th>
-                                        <th>Egg Turner</th>
-                                        <th>Fan Status</th>
-                                        <th>Heater Status</th>
-                                        <th>Humidity</th>
-                                        <th>Temperature</th>
-                                        <th>Water Presence</th>
-                                    `;
-                                    thead.appendChild(tr);
-                                    table.appendChild(thead);
-
-                                    const tbody = document.createElement('tbody');
-                                    table.appendChild(tbody);
-
-                                    Object.keys(hourData).forEach(minuteNode => {
-                                        const minuteData = hourData[minuteNode];
-                                        const row = tbody.insertRow();
-                                        row.innerHTML = `
-                                            <td>${minuteNode}</td>
-                                            <td>${minuteData.Button_turner_status || ''}</td>
-                                            <td>${minuteData.Egg_turner_status || ''}</td>
-                                            <td>${minuteData['Fan Status'] || ''}</td>
-                                            <td>${minuteData.Heater_status || ''}</td>
-                                            <td>${minuteData.Humidity || ''}</td>
-                                            <td>${minuteData.Temperature || ''}</td>
-                                            <td>${minuteData.Water_presense || ''}</td>
-                                        `;
-                                    });
-
-                                    tableContainer.appendChild(table);
-
-                                    // Button group container
-                                    const buttonGroup = document.createElement('div');
-                                    buttonGroup.className = 'button-group';
-
-                                    // Download Button
-                                    const downloadButton = document.createElement('button');
-                                    downloadButton.className = 'btn btn-success';
-                                    downloadButton.textContent = 'Download PDF';
-
-                                    // Delete Hour Button
-                                    const deleteHourButton = document.createElement('button');
-                                    deleteHourButton.className = 'btn btn-delete';
-                                    deleteHourButton.textContent = 'Delete Hour';
-
-                                    // Add click handlers
-                                    downloadButton.addEventListener('click', function () {
-                                        buttonGroup.style.display = 'none';
-                                        const opt = {
-                                            margin: 0.5,
-                                            filename: `Data_${dayNode}_${hourNode}.pdf`,
-                                            image: { type: 'jpeg', quality: 0.98 },
-                                            html2canvas: { scale: 2 },
-                                            jsPDF: { unit: 'in', format: 'legal', orientation: 'landscape' }
-                                        };
-                                        html2pdf()
-                                            .from(tableContainer)
-                                            .set(opt)
-                                            .save()
-                                            .then(() => {
-                                                buttonGroup.style.display = 'flex';
-                                            });
-                                    });
-
-                                    deleteHourButton.addEventListener('click', function() {
-                                        currentHourToDelete = hourNode;
-                                        currentDayForHour = dayNode;
-                                        hourModal.style.display = "block";
-                                    });
-
-                                    // Add buttons to group
-                                    buttonGroup.appendChild(downloadButton);
-                                    buttonGroup.appendChild(deleteHourButton);
-                                    tableContainer.appendChild(buttonGroup);
-                                    dayTableContainer.appendChild(tableContainer);
-                                });
-                            }
-                            dayTableContainer.style.display = 'block';
-                            dayButton.classList.add('active');
-                        }
-                        isOpen = !isOpen;
-                    });
-                });
-
-                // Configure delete day confirmation
-                confirmDelete.onclick = function() {
-                    if (currentDayToDelete) {
-                        db.ref(`logs/${currentDayToDelete}`).remove()
-                            .then(() => {
-                                const buttonContainers = document.querySelectorAll('.day-button-container');
-                                buttonContainers.forEach(container => {
-                                    if (container.querySelector('button').textContent.toLowerCase() === currentDayToDelete) {
-                                        container.remove();
-                                    }
-                                });
-                                const tableContainer = document.getElementById(`${currentDayToDelete}-data`);
-                                if (tableContainer) {
-                                    tableContainer.remove();
-                                }
-                                dayModal.style.display = "none";
-                                currentDayToDelete = null;
-                            })
-                            .catch((error) => {
-                                console.error("Error deleting data:", error);
-                                alert("Error deleting data. Please try again.");
-                                dayModal.style.display = "none";
-                                currentDayToDelete = null;
-                            });
-                    }
-                }
-
-                // Configure delete hour confirmation
-                confirmDeleteHour.onclick = function() {
-                    if (currentHourToDelete && currentDayForHour) {
-                        db.ref(`logs/${currentDayForHour}/${currentHourToDelete}`).remove()
-                            .then(() => {
-                                const hourContainer = document.getElementById(`${currentDayForHour}-${currentHourToDelete}-container`);
-                                if (hourContainer) {
-                                    hourContainer.remove();
-                                }
-                                hourModal.style.display = "none";
-                                currentHourToDelete = null;
-                                currentDayForHour = null;
-                            })
-                            .catch((error) => {
-                                console.error("Error deleting hour data:", error);
-                                alert("Error deleting hour data. Please try again.");
-                                hourModal.style.display = "none";
-                                currentHourToDelete = null;
-                                currentDayForHour = null;
-                            });
-                    }
-                }
+            // Add delete functionality
+            deleteButton.onclick = function(e) {
+                e.stopPropagation();
+                currentDayToDelete = dayNode;
+                dayModal.style.display = "block";
             }
 
-            // Hide loading animation after data is loaded
-            document.getElementById("loading").style.display = "none";
+            // Add buttons to container
+            dayButtonContainer.appendChild(dayButton);
+            dayButtonContainer.appendChild(deleteButton);
+            buttonsContainer.appendChild(dayButtonContainer);
+
+            // Create Table Container
+            const dayTableContainer = document.createElement('div');
+            dayTableContainer.className = 'data-table-container';
+            dayTableContainer.id = `${dayNode}-data`;
+            document.getElementById("tables-container").appendChild(dayTableContainer);
+
+            // Attach isOpen state to the button
+            dayButton.isOpen = false;
+
+            dayButton.addEventListener('click', function () {
+                // Close all other day tables
+                document.querySelectorAll('.data-table-container').forEach(container => {
+                    if (container.id !== `${dayNode}-data`) {
+                        container.style.display = 'none';
+                    }
+                });
+
+                // Remove active class from all buttons
+                document.querySelectorAll('#buttons-container .btn-primary').forEach(button => {
+                    button.classList.remove('active');
+                });
+
+                if (dayButton.isOpen) {
+                    dayTableContainer.style.display = 'none';
+                    dayButton.classList.remove('active');
+                    dayButton.isOpen = false;
+                } else {
+                    if (!dayTableContainer.innerHTML) {
+                        const dayData = data[dayNode];
+                        Object.keys(dayData).forEach(hourNode => {
+                            const hourData = dayData[hourNode];
+                            const tableContainer = document.createElement('div');
+                            tableContainer.className = 'table-responsive';
+                            tableContainer.id = `${dayNode}-${hourNode}-container`;
+
+                            const tableTitle = document.createElement('div');
+                            tableTitle.className = 'table-title';
+                            tableTitle.textContent = `Data for ${dayNode} - ${hourNode}`;
+                            tableContainer.appendChild(tableTitle);
+
+                            const table = document.createElement('table');
+                            table.className = 'table table-bordered table-hover';
+                            const thead = document.createElement('thead');
+                            const tr = document.createElement('tr');
+                            tr.innerHTML = `
+                                <th>Minutes</th>
+                                <th>Button Turner</th>
+                                <th>Egg Turner</th>
+                                <th>Fan Status</th>
+                                <th>Heater Status</th>
+                                <th>Humidity</th>
+                                <th>Temperature</th>
+                                <th>Water Presence</th>
+                            `;
+                            thead.appendChild(tr);
+                            table.appendChild(thead);
+
+                            const tbody = document.createElement('tbody');
+                            table.appendChild(tbody);
+
+                            Object.keys(hourData).forEach(minuteNode => {
+                                const minuteData = hourData[minuteNode];
+                                const row = tbody.insertRow();
+                                row.innerHTML = `
+                                    <td>${minuteNode}</td>
+                                    <td>${minuteData.Button_turner_status || ''}</td>
+                                    <td>${minuteData.Egg_turner_status || ''}</td>
+                                    <td>${minuteData['Fan Status'] || ''}</td>
+                                    <td>${minuteData.Heater_status || ''}</td>
+                                    <td>${minuteData.Humidity || ''}</td>
+                                    <td>${minuteData.Temperature || ''}</td>
+                                    <td>${minuteData.Water_presense || ''}</td>
+                                `;
+                            });
+
+                            tableContainer.appendChild(table);
+
+                            // Button group container
+                            const buttonGroup = document.createElement('div');
+                            buttonGroup.className = 'button-group';
+
+                            // Download Button
+                            const downloadButton = document.createElement('button');
+                            downloadButton.className = 'btn btn-success';
+                            downloadButton.textContent = 'Download PDF';
+
+                            // Delete Hour Button
+                            const deleteHourButton = document.createElement('button');
+                            deleteHourButton.className = 'btn btn-delete';
+                            deleteHourButton.textContent = 'Delete Hour';
+
+                            // Add click handlers
+                            downloadButton.addEventListener('click', function () {
+                                buttonGroup.style.display = 'none';
+                                const opt = {
+                                    margin: 0.5,
+                                    filename: `Data_${dayNode}_${hourNode}.pdf`,
+                                    image: { type: 'jpeg', quality: 0.98 },
+                                    html2canvas: { scale: 2 },
+                                    jsPDF: { unit: 'in', format: 'legal', orientation: 'landscape' }
+                                };
+                                html2pdf()
+                                    .from(tableContainer)
+                                    .set(opt)
+                                    .save()
+                                    .then(() => {
+                                        buttonGroup.style.display = 'flex';
+                                    });
+                            });
+
+                            deleteHourButton.addEventListener('click', function() {
+                                currentHourToDelete = hourNode;
+                                currentDayForHour = dayNode;
+                                hourModal.style.display = "block";
+                            });
+
+                            // Add buttons to group
+                            buttonGroup.appendChild(downloadButton);
+                            buttonGroup.appendChild(deleteHourButton);
+                            tableContainer.appendChild(buttonGroup);
+                            dayTableContainer.appendChild(tableContainer);
+                        });
+                    }
+                    dayTableContainer.style.display = 'block';
+                    dayButton.classList.add('active');
+                    dayButton.isOpen = true;
+                }
+            });
         });
+
+        // Configure delete day confirmation
+        confirmDelete.onclick = function() {
+            if (currentDayToDelete) {
+                db.ref(`logs/${currentDayToDelete}`).remove()
+                    .then(() => {
+                        const buttonContainers = document.querySelectorAll('.day-button-container');
+                        buttonContainers.forEach(container => {
+                            if (container.querySelector('button').textContent.toLowerCase() === currentDayToDelete) {
+                                container.remove();
+                            }
+                        });
+                        const tableContainer = document.getElementById(`${currentDayToDelete}-data`);
+                        if (tableContainer) {
+                            tableContainer.remove();
+                        }
+                        dayModal.style.display = "none";
+                        currentDayToDelete = null;
+                    })
+                    .catch((error) => {
+                        console.error("Error deleting data:", error);
+                        alert("Error deleting data. Please try again.");
+                        dayModal.style.display = "none";
+                        currentDayToDelete = null;
+                    });
+            }
+        }
+
+        // Configure delete hour confirmation
+        confirmDeleteHour.onclick = function() {
+            if (currentHourToDelete && currentDayForHour) {
+                db.ref(`logs/${currentDayForHour}/${currentHourToDelete}`).remove()
+                    .then(() => {
+                        const hourContainer = document.getElementById(`${currentDayForHour}-${currentHourToDelete}-container`);
+                        if (hourContainer) {
+                            hourContainer.remove();
+                        }
+                        hourModal.style.display = "none";
+                        currentHourToDelete = null;
+                        currentDayForHour = null;
+                    })
+                    .catch((error) => {
+                        console.error("Error deleting hour data:", error);
+                        alert("Error deleting hour data. Please try again.");
+                        hourModal.style.display = "none";
+                        currentHourToDelete = null;
+                        currentDayForHour = null;
+                    });
+            }
+        }
+    }
+
+    // Hide loading animation after data is loaded
+    document.getElementById("loading").style.display = "none";
+});
     </script>
 </body>
 
