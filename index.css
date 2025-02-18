@@ -1,0 +1,111 @@
+ /* General Styling */
+ body {
+    background-color: #f7f9fc; /* Light gray-blue background */
+    color: #333; /* Dark text color */
+    font-family: 'Arial', sans-serif;
+  }
+
+  .navbar {
+    background-color: #14532d; /* Dark green */
+  }
+
+  .navbar-brand,
+  .nav-link {
+    color: #ffffff !important;
+  }
+
+  .navbar-brand {
+    font-weight: bold;
+    font-size: 1.5rem;
+  }
+
+  .nav-link.active {
+    color: #86efac !important; /* Light green active link */
+  }
+
+  h1 {
+    color: #14532d; /* Dark green */
+  }
+
+  /* Card Styles */
+  .card {
+    border: none;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+  }
+
+  .card-body {
+    padding: 1.5rem;
+  }
+
+  .custom-card-body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  /* Button Styles */
+  .btn-primary {
+    background-color: #22c55e; /* Green */
+    border: none;
+  }
+
+  .btn-primary:hover {
+    background-color: #16a34a; /* Darker green */
+  }
+
+  .btn-success {
+    background-color: #15803d; /* Dark green for success */
+    border: none;
+  }
+
+  .btn-warning {
+    background-color: #facc15; /* Yellow */
+    border: none;
+  }
+
+  .btn-warning:hover {
+    background-color: #eab308; /* Darker yellow */
+  }
+
+  .btn-lg {
+    font-size: 1.25rem;
+    border-radius: 8px;
+  }
+
+  .btn {
+    transition: background-color 0.3s, transform 0.2s;
+  }
+
+  .btn:hover {
+    transform: translateY(-2px);
+  }
+
+  /* Data Styles */
+  .data-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .data-list p {
+    font-size: 1.1rem;
+    line-height: 1.6;
+  }
+
+  /* Footer */
+  footer {
+    margin-top: 2rem;
+    text-align: center;
+    color: #666;
+    font-size: 0.9rem;
+  }
+
+  button a {
+    color: white; /* Dark green */
+    text-decoration: none;
+  }
+
+  button a:hover {
+    color: black;
+  }
