@@ -113,51 +113,52 @@
       }
     });
 
-    // Temperature control buttons
-    const addTempButton = document.getElementById('add_temp');
-    const subTempButton = document.getElementById('sub_temp');
+// Function to handle temperature increment and decrement
+const addTempButton = document.getElementById('add_temp');
+const subTempButton = document.getElementById('sub_temp');
 
-    addTempButton.addEventListener('click', () => {
-      dataRef.child('set_temperature').get().then((snapshot) => {
-        if (snapshot.exists()) {
-          const currentTemperature = snapshot.val();
-          const newTemperature = currentTemperature + 1;
+addTempButton.addEventListener('click', () => {
+  dataRef.child('set_temperature').get().then((snapshot) => {
+    if (snapshot.exists()) {
+      let currentTemperature = Number(snapshot.val()); // Convert to number
+      let newTemperature = currentTemperature + 1;
 
-          dataRef.update({ set_temperature: newTemperature })
-            .then(() => {
-              console.log(`Temperature incremented to ${newTemperature}`);
-            })
-            .catch((error) => {
-              console.error('Error incrementing temperature:', error);
-            });
-        } else {
-          console.error('set_temperature value not found in the database.');
-        }
-      }).catch((error) => {
-        console.error('Error fetching set_temperature:', error);
-      });
-    });
+      dataRef.update({ set_temperature: newTemperature })
+        .then(() => {
+          console.log(`Temperature incremented to ${newTemperature}`);
+        })
+        .catch((error) => {
+          console.error('Error incrementing temperature:', error);
+        });
+    } else {
+      console.error('set_temperature value not found in the database.');
+    }
+  }).catch((error) => {
+    console.error('Error fetching set_temperature:', error);
+  });
+});
 
-    subTempButton.addEventListener('click', () => {
-      dataRef.child('set_temperature').get().then((snapshot) => {
-        if (snapshot.exists()) {
-          const currentTemperature = snapshot.val();
-          const newTemperature = currentTemperature - 1;
+subTempButton.addEventListener('click', () => {
+  dataRef.child('set_temperature').get().then((snapshot) => {
+    if (snapshot.exists()) {
+      let currentTemperature = Number(snapshot.val()); // Convert to number
+      let newTemperature = currentTemperature - 1;
 
-          dataRef.update({ set_temperature: newTemperature })
-            .then(() => {
-              console.log(`Temperature decremented to ${newTemperature}`);
-            })
-            .catch((error) => {
-              console.error('Error decrementing temperature:', error);
-            });
-        } else {
-          console.error('set_temperature value not found in the database.');
-        }
-      }).catch((error) => {
-        console.error('Error fetching set_temperature:', error);
-      });
-    });
+      dataRef.update({ set_temperature: newTemperature })
+        .then(() => {
+          console.log(`Temperature decremented to ${newTemperature}`);
+        })
+        .catch((error) => {
+          console.error('Error decrementing temperature:', error);
+        });
+    } else {
+      console.error('set_temperature value not found in the database.');
+    }
+  }).catch((error) => {
+    console.error('Error fetching set_temperature:', error);
+  });
+});
+
 
     // Turner control button
     const btnTurner = document.getElementById('btn_turner');
